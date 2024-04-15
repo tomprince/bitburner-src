@@ -30,6 +30,7 @@ import { workerScripts } from "../Netscript/WorkerScripts";
 import { getRecordValues } from "../Types/Record";
 import { ServerConstants } from "../Server/data/Constants";
 import { isBitNodeFinished } from "../BitNode/BitNodeUtils";
+import { isLegacyScript } from "../Paths/ScriptFilePath";
 
 // Unable to correctly cast the JSON data into AchievementDataJson type otherwise...
 const achievementData = (<AchievementDataJson>(<unknown>data)).achievements;
@@ -198,7 +199,7 @@ export const achievements: Record<string, Achievement> = {
   NS2: {
     ...achievementData.NS2,
     Icon: "ns2",
-    Condition: () => [...Player.getHomeComputer().scripts.values()].some((s) => s.filename.endsWith(".js")),
+    Condition: () => [...Player.getHomeComputer().scripts.values()].some((s) => !isLegacyScript(s.filename)),
   },
   FROZE: {
     ...achievementData.FROZE,

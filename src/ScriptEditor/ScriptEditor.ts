@@ -71,6 +71,14 @@ export class ScriptEditor {
       languageDefaults.addExtraLib(reactTypes, "react.d.ts");
       languageDefaults.addExtraLib(reactDomTypes, "react-dom.d.ts");
     }
+    /**
+     * Ignore these errors in the editor:
+     * - Cannot find module ''. Did you mean to set the 'moduleResolution' option to 'node', or to add aliases to the 'paths' option?(2792)
+     * - Cannot use JSX unless the '--jsx' flag is provided.(17004)
+     */
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      diagnosticCodesToIgnore: [2792, 17004],
+    });
     monaco.languages.json.jsonDefaults.setModeConfiguration({
       ...monaco.languages.json.jsonDefaults.modeConfiguration,
       //completion should be disabled because the
