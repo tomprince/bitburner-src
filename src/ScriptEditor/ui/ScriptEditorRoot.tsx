@@ -328,7 +328,7 @@ function Root(props: IProps): React.ReactElement {
         },
       });
     }
-    //unmounting the editor will dispose all, doesnt hurt to dispose on close aswell
+
     closingScript.model.dispose();
     openScripts.splice(index, 1);
     if (openScripts.length === 0) {

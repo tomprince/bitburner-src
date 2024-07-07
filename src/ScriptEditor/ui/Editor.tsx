@@ -81,7 +81,6 @@ export function Editor({ onMount, onChange, onUnmount, openFile }: EditorProps) 
     return () => {
       onUnmount();
       disposables.forEach((d) => d.dispose());
-      monaco.editor.getModels().forEach((model) => model.dispose());
       editorRef.current?.dispose();
     };
     // this eslint ignore instruction can potentially cause unobvious bugs
