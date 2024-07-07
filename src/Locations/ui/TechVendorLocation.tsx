@@ -12,7 +12,7 @@ import { RamButton } from "./RamButton";
 import { TorButton } from "./TorButton";
 import { CoresButton } from "./CoresButton";
 
-import { getPurchaseServerCost } from "../../Server/ServerPurchases";
+import { getPurchaseServerCost, getPurchaseServerLimit } from "../../Server/ServerPurchases";
 
 import { Money } from "../../ui/React/Money";
 import { Player } from "@player";
@@ -24,6 +24,10 @@ import { useRerender } from "../../ui/React/hooks";
 function ServerButton(props: { ram: number }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const cost = getPurchaseServerCost(props.ram);
+
+  if (Player.purchasedServers.length >= getPurchaseServerLimit()) {
+    return <Button>Purchase {formatRam(props.ram)} Server&nbsp;-&nbsp;MAX SERVERS</Button>;
+  }
   return (
     <>
       <Button onClick={() => setOpen(true)} disabled={!Player.canAfford(cost)}>
