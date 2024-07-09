@@ -148,6 +148,12 @@ module.exports = (env, argv) => {
     module: {
       rules: [
         {
+          test: path.resolve(__dirname, "src/ScriptEditor/worker-url.js"),
+          parser: {
+            worker: ["String()"],
+          },
+        },
+        {
           test: /\.(js$|jsx|ts|tsx)$/,
           exclude: /node_modules/,
           resourceQuery: { not: /raw/ },
