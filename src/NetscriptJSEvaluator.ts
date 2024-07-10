@@ -83,16 +83,26 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
     return script.mod;
   }
 
+  const getScriptURL = (filename: string) => {
+    const importedScript = getModuleScript(filename, script.filename, scripts);
+
+    seenStack.push(script);
+    importedScript.mod = generateLoadedModule(importedScript, scripts, seenStack);
+    seenStack.pop();
+    const scriptURL = importedScript.mod.url;
+    return scriptURL;
+  };
+
   let scriptCode;
   const fileType = getFileType(script.filename);
   switch (fileType) {
     case FileType.JS:
-      scriptCode = script.code;
+      scriptCode = generateJS(script.code, getScriptURL);
       break;
     case FileType.JSX:
     case FileType.TS:
     case FileType.TSX:
-      scriptCode = transformScript(script.filename, script.code, fileType);
+      scriptCode = transformScript(script, fileType, getScriptURL);
       break;
     default:
       throw new Error(`Invalid file type: ${fileType}. Filename: ${script.filename}, server: ${script.server}.`);
@@ -101,6 +111,39 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
     throw new Error(`Cannot transform script. Filename: ${script.filename}, server: ${script.server}.`);
   }
 
+  const cachedMod = moduleCache.get(scriptCode)?.deref();
+  if (cachedMod) {
+    script.mod = cachedMod;
+  } else {
+    // Add an inline source-map to make debugging nicer. This won't be right
+    // in all cases, since we can share the same script across multiple
+    // servers; it will be listed under the first server it was compiled for.
+    // We don't include this in the cache key, so that other instances of the
+    // script dedupe properly.
+    const adjustedCode = scriptCode + `\n//# sourceURL=${script.server}/${script.filename}`;
+
+    const url = URL.createObjectURL(makeScriptBlob(adjustedCode)) as ScriptURL;
+    const module = config.doImport(url).catch((e) => {
+      script.invalidateModule();
+      console.error(`Error occurred while attempting to compile ${script.filename} on ${script.server}:`);
+      console.error(e);
+      throw e;
+    });
+    // We can *immediately* invalidate the Blob, because we've already started the fetch
+    // by starting the import. From now on, any imports using the blob's URL *must*
+    // directly return the module, without even attempting to fetch, due to the way
+    // modules work.
+    URL.revokeObjectURL(url);
+    script.mod = new LoadedModule(url, module);
+    moduleCache.set(scriptCode, new WeakRef(script.mod));
+    cleanup.register(script.mod, scriptCode);
+  }
+
+  addDependencyInfo(script, seenStack);
+  return script.mod;
+}
+
+function generateJS(scriptCode: string, getScriptURL: (filename: string) => string) {
   // Inspired by: https://stackoverflow.com/a/43834063/91401
   const ast = parse(scriptCode, { sourceType: "module", ecmaVersion: "latest", ranges: true });
   interface importNode {
@@ -143,43 +186,7 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
   let newCode = scriptCode;
   // Loop through each node and replace the script name with a blob url.
   for (const node of importNodes) {
-    const importedScript = getModuleScript(node.filename, script.filename, scripts);
-
-    seenStack.push(script);
-    importedScript.mod = generateLoadedModule(importedScript, scripts, seenStack);
-    seenStack.pop();
-    newCode = newCode.substring(0, node.start) + importedScript.mod.url + newCode.substring(node.end);
+    newCode = newCode.substring(0, node.start) + getScriptURL(node.filename) + newCode.substring(node.end);
   }
-
-  const cachedMod = moduleCache.get(newCode)?.deref();
-  if (cachedMod) {
-    script.mod = cachedMod;
-  } else {
-    // Add an inline source-map to make debugging nicer. This won't be right
-    // in all cases, since we can share the same script across multiple
-    // servers; it will be listed under the first server it was compiled for.
-    // We don't include this in the cache key, so that other instances of the
-    // script dedupe properly.
-    const adjustedCode = newCode + `\n//# sourceURL=${script.server}/${script.filename}`;
-    // At this point we have the full code and can construct a new blob / assign the URL.
-
-    const url = URL.createObjectURL(makeScriptBlob(adjustedCode)) as ScriptURL;
-    const module = config.doImport(url).catch((e) => {
-      script.invalidateModule();
-      console.error(`Error occurred while attempting to compile ${script.filename} on ${script.server}:`);
-      console.error(e);
-      throw e;
-    });
-    // We can *immediately* invalidate the Blob, because we've already started the fetch
-    // by starting the import. From now on, any imports using the blob's URL *must*
-    // directly return the module, without even attempting to fetch, due to the way
-    // modules work.
-    URL.revokeObjectURL(url);
-    script.mod = new LoadedModule(url, module);
-    moduleCache.set(newCode, new WeakRef(script.mod));
-    cleanup.register(script.mod, newCode);
-  }
-
-  addDependencyInfo(script, seenStack);
-  return script.mod;
+  return newCode;
 }

@@ -9,6 +9,9 @@ declare global {
   // eslint-disable-next-line no-var
   var forceBabelTransform: boolean;
 }
+interface remapOptions {
+  getScriptURL(filename: string): string;
+}
 
 export type AcornASTProgram = acorn.Program;
 export type BabelASTProgram = object;
@@ -118,42 +121,35 @@ export function getModuleScript(
   return script;
 }
 
-export function transformScript(filename: string, code: string, fileType: FileType): string | null | undefined {
+export function transformScript(
+  script: Script,
+  fileType: FileType,
+  getScriptURL: (filename: string) => string,
+): string | null | undefined {
   if (supportedFileTypes.every((v) => v !== fileType)) {
     throw new Error(`Invalid file type: ${fileType}`);
   }
   const fileTypeFeature = getFileTypeFeature(fileType);
-  // This is only for testing. It will be removed after we decide between Babel and SWC.
-  if (globalThis.forceBabelTransform) {
-    const presets = [];
-    if (fileTypeFeature.isReact) {
-      presets.push("react");
-    }
-    if (fileTypeFeature.isTypeScript) {
-      presets.push("typescript");
-    }
-    return babel.transform(code, { filename: filename, presets: presets }).code;
+  const presets = [];
+  if (fileTypeFeature.isReact) {
+    presets.push("react");
   }
-  let parserConfig: ParserConfig;
   if (fileTypeFeature.isTypeScript) {
-    parserConfig = {
-      syntax: "typescript",
-    };
-    if (fileTypeFeature.isReact) {
-      parserConfig.tsx = true;
-    }
-  } else {
-    parserConfig = {
-      syntax: "ecmascript",
-    };
-    if (fileTypeFeature.isReact) {
-      parserConfig.jsx = true;
-    }
+    presets.push("typescript");
   }
-  return transformSync(code, {
-    jsc: {
-      parser: parserConfig,
-      target: "es2020",
+  const remapPlugin: import("@babel/core").PluginObj = {
+    visitor: {
+      ImportOrExportDeclaration(path) {
+        if (!("source" in path.node) || !path.node.source) {
+          return;
+        }
+        path.node.source.value = getScriptURL(path.node.source.value);
+      },
     },
+  };
+  return babel.transform(script.code, {
+    filename: script.filename,
+    presets: presets,
+    plugins: [remapPlugin],
   }).code;
 }
