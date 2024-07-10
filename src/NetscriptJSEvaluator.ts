@@ -4,6 +4,7 @@
  */
 import * as walk from "acorn-walk";
 import { parse } from "acorn";
+import * as convertSourceMap from "convert-source-map";
 
 import { LoadedModule, type ScriptURL, type ScriptModule } from "./Script/LoadedModule";
 import type { Script } from "./Script/Script";
@@ -93,7 +94,7 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
     return scriptURL;
   };
 
-  let scriptCode;
+  let scriptCode, sourceMap;
   const fileType = getFileType(script.filename);
   switch (fileType) {
     case FileType.JS:
@@ -102,13 +103,10 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
     case FileType.JSX:
     case FileType.TS:
     case FileType.TSX:
-      scriptCode = transformScript(script, fileType, getScriptURL);
+      ({ scriptCode, sourceMap } = transformScript(script, fileType, getScriptURL));
       break;
     default:
       throw new Error(`Invalid file type: ${fileType}. Filename: ${script.filename}, server: ${script.server}.`);
-  }
-  if (!scriptCode) {
-    throw new Error(`Cannot transform script. Filename: ${script.filename}, server: ${script.server}.`);
   }
 
   const cachedMod = moduleCache.get(scriptCode)?.deref();
@@ -120,7 +118,13 @@ function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Scrip
     // servers; it will be listed under the first server it was compiled for.
     // We don't include this in the cache key, so that other instances of the
     // script dedupe properly.
-    const adjustedCode = scriptCode + `\n//# sourceURL=${script.server}/${script.filename}`;
+    const sourceURL = `${script.server}/${script.filename}`;
+    const adjustedCode = sourceMap
+      ? scriptCode +
+        `\n//# sourceURL=${sourceURL}.generated` +
+        `\n${convertSourceMap.fromObject({ ...sourceMap, sources: [sourceURL], sourceRoot: "/" }).toComment()}`
+      : scriptCode + `\n//# sourceURL=${sourceURL}`;
+    // At this point we have the full code and can construct a new blob / assign the URL.
 
     const url = URL.createObjectURL(makeScriptBlob(adjustedCode)) as ScriptURL;
     const module = config.doImport(url).catch((e) => {

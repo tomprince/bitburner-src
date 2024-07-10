@@ -125,7 +125,7 @@ export function transformScript(
   script: Script,
   fileType: FileType,
   getScriptURL: (filename: string) => string,
-): string | null | undefined {
+): { scriptCode: string; sourceMap: object | undefined } {
   if (supportedFileTypes.every((v) => v !== fileType)) {
     throw new Error(`Invalid file type: ${fileType}`);
   }
@@ -147,9 +147,17 @@ export function transformScript(
       },
     },
   };
-  return babel.transform(script.code, {
+  const result = babel.transform(script.code, {
     filename: script.filename,
     presets: presets,
     plugins: [remapPlugin],
-  }).code;
+    sourceMaps: true,
+  });
+  if (!result.code) {
+    throw new Error(`Cannot transform script. Filename: ${script.filename}, server: ${script.server}.`);
+  }
+  return {
+    scriptCode: result.code,
+    sourceMap: result.map!,
+  };
 }
