@@ -158,6 +158,13 @@ module.exports = (env, argv) => {
           resourceQuery: /raw/,
           type: "asset/source",
         },
+        // See https://github.com/babel/babel/issues/14301
+        {
+          include: path.resolve(__dirname, "node_modules/@babel/standalone/babel.js"),
+          parser: {
+            exprContextCritical: false,
+          },
+        },
       ],
     },
     optimization: {
