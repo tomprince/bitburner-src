@@ -26,7 +26,11 @@ function ServerButton(props: { ram: number }): React.ReactElement {
   const cost = getPurchaseServerCost(props.ram);
 
   if (Player.purchasedServers.length >= getPurchaseServerLimit()) {
-    return <Button>Purchase {formatRam(props.ram)} Server&nbsp;-&nbsp;MAX SERVERS</Button>;
+    return (
+      <Button disabled={true} variant="maxed">
+        Purchase {formatRam(props.ram)} Server&nbsp;-&nbsp;MAX SERVERS
+      </Button>
+    );
   }
   return (
     <>

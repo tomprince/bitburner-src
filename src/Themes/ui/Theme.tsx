@@ -185,10 +185,20 @@ export function refreshTheme(): void {
             "&:hover": {
               backgroundColor: Settings.theme.backgroundsecondary,
             },
-
             borderRadius: 0,
           },
         },
+        variants: [
+          {
+            props: { variant: "maxed" },
+            style: {
+              // We use a nested selector here, so that this is higher specificity than the `Mui-disabled` class.
+              "&:disabled": {
+                color: Settings.theme.secondary,
+              },
+            },
+          },
+        ],
       },
       MuiSelect: {
         styleOverrides: {

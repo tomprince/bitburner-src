@@ -30,4 +30,13 @@ declare global {
       };
     };
   }
+
+  declare module "@mui/material/Button" {
+    /**
+     * We add a custom variant button for use in tech vendor screens, when the player has maxed out the thing being bought.
+     */
+    interface ButtonPropsVariantOverrides {
+      maxed: true;
+    }
+  }
 }

@@ -23,7 +23,11 @@ export function RamButton(props: IProps): React.ReactElement {
     (Player.bitNodeOptions.restrictHomePCUpgrade && homeComputer.maxRam >= 128) ||
     homeComputer.maxRam >= ServerConstants.HomeComputerMaxRam
   ) {
-    return <Button>Upgrade 'home' RAM - MAX</Button>;
+    return (
+      <Button disabled={true} variant="maxed">
+        Upgrade 'home' RAM - MAX
+      </Button>
+    );
   }
 
   const cost = Player.getUpgradeHomeRamCost();

@@ -47,7 +47,11 @@ export function TorButton(props: IProps): React.ReactElement {
   }
 
   if (Player.hasTorRouter()) {
-    return <Button>TOR Router - Purchased</Button>;
+    return (
+      <Button disabled={true} variant="maxed">
+        TOR Router - Purchased
+      </Button>
+    );
   }
 
   return (
