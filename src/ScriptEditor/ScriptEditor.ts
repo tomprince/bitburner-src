@@ -70,19 +70,28 @@ export class ScriptEditor {
       languageDefaults.addExtraLib(source, "netscript.d.ts");
       languageDefaults.addExtraLib(reactTypes, "react.d.ts");
       languageDefaults.addExtraLib(reactDomTypes, "react-dom.d.ts");
+      languageDefaults.setCompilerOptions({
+        ...languageDefaults.getCompilerOptions(),
+        // We allow direct importing of `.ts`/`.tsx` files, so tell the typescript language server that.
+        allowImportingTsExtensions: true,
+        // We use file-at-a-time transpiler. See https://www.typescriptlang.org/tsconfig/#isolatedModules
+        isolatedModules: true,
+        // We use the classic (i.e. `React.createElement`:) react runtime.
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        // We define `React` and `ReactDOM` as globals. Don't mark using them as errors.
+        allowUmdGlobalAccess: true,
+      });
+      languageDefaults.setDiagnosticsOptions({
+        ...languageDefaults.getDiagnosticsOptions(),
+        // Ignore these errors in the editor:
+        diagnosticCodesToIgnore: [
+          // We define `React` and `ReactDOM` as globals. Don't mark using them as errors.
+          // - 'React' refers to a UMD global, but the current file is a module. Consider adding an import instead.(2686)
+          2686,
+        ],
+      });
     }
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-      ...monaco.languages.typescript.typescriptDefaults.getCompilerOptions(),
-      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-      allowUmdGlobalAccess: true,
-    });
-    /**
-     * Ignore these errors in the editor:
-     * - Cannot find module ''. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?(2792)
-     */
-    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-      diagnosticCodesToIgnore: [2792],
-    });
+
     monaco.languages.json.jsonDefaults.setModeConfiguration({
       ...monaco.languages.json.jsonDefaults.modeConfiguration,
       //completion should be disabled because the
