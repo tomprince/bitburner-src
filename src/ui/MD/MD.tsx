@@ -43,10 +43,12 @@ export function MD(props: { pageFilePath: FilePath; top: number }): React.ReactE
         blockquote: Blockquote,
         a: A,
       }}
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeMathjax]}
+      // We generated JSON-ified hast during the webpack build.
+      // This adds a rehype plugin that ignores its input and returns
+      // the pre-generated hast instead.
+      rehypePlugins={[() => () => pageContent]}
     >
-      {pageContent}
+      {""}
     </ReactMarkdown>
   );
 }
