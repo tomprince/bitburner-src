@@ -1,6 +1,5 @@
 import type { BaseServer } from "../Server/BaseServer";
 import type { FilePath } from "./FilePath";
-import { escapeRegExp } from "lodash";
 
 /** The directory part of a BasicFilePath. Everything up to and including the last /
  * e.g. "file.js" => "", or "dir/file.js" => "dir/", or "../test.js" => "../" */
@@ -27,7 +26,7 @@ export const root = "" as Directory;
 const invalidCharacters = ["/", "*", "?", "[", "]", "!", "\\", "~", "|", "#", '"', "'", " "];
 
 /** A valid character is any character that is not one of the invalid characters */
-export const oneValidCharacter = `[^${escapeRegExp(invalidCharacters.join(""))}]`;
+export const oneValidCharacter = `[^${invalidCharacters.map((c) => "\\" + c).join("")}]`;
 
 /** Regex string for matching the directory part of a valid filepath */
 export const directoryRegexString = `^(?<directory>(?:${oneValidCharacter}+\\/)*)`;
