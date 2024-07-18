@@ -1,5 +1,5 @@
 import { GetServer } from "../../Server/AllServers";
-import { editor, Uri } from "monaco-editor";
+import { editor, Uri, languages } from "monaco-editor";
 import { OpenScript } from "./OpenScript";
 import { getFileType, FileType } from "../../utils/ScriptTransformer";
 
@@ -22,6 +22,20 @@ function reorder(list: unknown[], startIndex: number, endIndex: number): void {
   const [removed] = list.splice(startIndex, 1);
   list.splice(endIndex, 0, removed);
 }
+
+const workers: Promise<Awaited<ReturnType<typeof languages.typescript.getJavaScriptWorker>>[]> = new Promise(
+  (resolve) => {
+    let count = 0;
+    const callback = () => {
+      if (++count == 2) {
+        resolve(Promise.all([languages.typescript.getJavaScriptWorker(), languages.typescript.getTypeScriptWorker()]));
+      }
+    };
+    languages.onLanguage("typescript", callback);
+    languages.onLanguage("javascript", callback);
+  },
+);
+
 function makeModel(hostname: string, filename: string, code: string) {
   const uri = Uri.from({
     scheme: "file",
@@ -52,7 +66,9 @@ function makeModel(hostname: string, filename: string, code: string) {
       throw new Error(`Invalid file type: ${fileType}. Filename: ${filename}.`);
   }
   //if somehow a model already exist return it
-  return editor.getModel(uri) ?? editor.createModel(code, language, uri);
+  const model = editor.getModel(uri) ?? editor.createModel(code, language, uri);
+  workers.then((ws) => ws.forEach((w) => w(uri)));
+  return model;
 }
 
 export { getServerCode, dirty, reorder, makeModel };

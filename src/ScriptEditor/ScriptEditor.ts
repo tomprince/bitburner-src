@@ -79,6 +79,7 @@ export class ScriptEditor {
       });
       languageDefaults.setCompilerOptions({
         ...languageDefaults.getCompilerOptions(),
+        allowJs: true,
         // We allow direct importing of `.ts`/`.tsx` files, so tell the typescript language server that.
         allowImportingTsExtensions: true,
         // We use file-at-a-time transpiler. See https://www.typescriptlang.org/tsconfig/#isolatedModules
