@@ -3,5 +3,11 @@
 // the script, we tell webpack that in this module, `String(new URL(...))` should be
 // treated as creating a web worker. That gives us access to the URL of the script,
 // which we can pass to monaco.
-const url = String(new URL("./worker.ts", import.meta.url));
+const url = String(
+  new URL(
+    /* webpackChunkName: "custom-ts" */
+    "./worker.ts",
+    import.meta.url,
+  ),
+);
 export default url;

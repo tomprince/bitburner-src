@@ -2,47 +2,98 @@
 
 import type ts from "typescript/lib/typescript";
 
-import { resolveScriptFilePath } from "../Paths/ScriptFilePath";
-import { asFilePath } from "../Paths/FilePath";
+import {
+  ScriptFilePath,
+  allScriptExtensions,
+  hasScriptExtension,
+  isLegacyScript,
+  resolveScriptFilePath,
+  scriptExtensions,
+} from "../Paths/ScriptFilePath";
+import { type FilePath, asFilePath } from "../Paths/FilePath";
 
+type TSWorkerClass = monaco.languages.typescript.TypeScriptWorker & {
+  new (): TSWorkerClass;
+  fileExists(path: string): boolean;
+};
 // From https://github.com/microsoft/monaco-editor/blob/v0.50.0/src/language/typescript/tsWorker.ts#L486C1-L492C2
 interface CustomTSWebWorkerFactory {
   (
-    TSWorkerClass: monaco.languages.typescript.TypeScriptWorker & {
-      new (): monaco.languages.typescript.TypeScriptWorker;
-    },
+    TSWorkerClass: TSWorkerClass,
     tsc: typeof ts,
     libs: Record<string, string>,
   ): monaco.languages.typescript.TypeScriptWorker;
 }
 
 declare global {
+  // This particular eslint-disable is correct.
+  // var is need to define things on globalThis
+  // See https://github.com/typescript-eslint/typescript-eslint/issues/7941
+  // eslint-disable-next-line no-var
   var customTSWorkerFactory: CustomTSWebWorkerFactory;
 }
 
-globalThis.customTSWorkerFactory = (TSWorkerClass, tsc, libs) => {
+const getURI = (host: string, path: string) =>
+  monaco.Uri.from({
+    scheme: "file",
+    authority: host,
+    path: path,
+  });
+
+const getScriptCandidates = (path: string, base: FilePath): ScriptFilePath[] => {
+  if (isLegacyScript(base)) {
+    return [resolveScriptFilePath(path, base, ".script")].filter(Boolean) as ScriptFilePath[];
+  } else {
+    if (hasScriptExtension(path)) {
+      return [resolveScriptFilePath(path, base)].filter(Boolean) as ScriptFilePath[];
+    } else {
+      return scriptExtensions.map((ext) => resolveScriptFilePath(path, base, ext)).filter(Boolean) as ScriptFilePath[];
+    }
+  }
+};
+
+globalThis.customTSWorkerFactory = (TSWorkerClass, __tsc, __libs) => {
   class CustomWorker extends TSWorkerClass implements Partial<ts.LanguageServiceHost> {
+    /**
+     * Resolve a list of module identifier relative to the containing module.
+     * @param moduleLiterals List of module identifiers to resolve.
+     * @param containingFile The monaco URI of the containing module, as a string.
+     * @returns An array of module resolutions, in the same order as arguments.
+     */
     resolveModuleNameLiterals?(
       moduleLiterals: readonly ts.StringLiteralLike[],
       containingFile: string,
-      redirectedReference: ts.ResolvedProjectReference | undefined,
-      options: ts.CompilerOptions,
-      containingSourceFile: ts.SourceFile,
-      reusedNames: readonly ts.StringLiteralLike[] | undefined,
+      __redirectedReference: ts.ResolvedProjectReference | undefined,
+      __options: ts.CompilerOptions,
+      __containingSourceFile: ts.SourceFile,
+      __reusedNames: readonly ts.StringLiteralLike[] | undefined,
     ): readonly ts.ResolvedModuleWithFailedLookupLocations[] {
-      const containingUri = monaco.Uri.parse(containingFile);
-      const containingPath = asFilePath(containingUri.path.slice(1));
+      const { scheme, authority: host, path } = monaco.Uri.parse(containingFile);
+      if (scheme != "file") {
+        return [];
+      }
+      const base = asFilePath(path.slice(1));
       return moduleLiterals.map(({ text: path }) => {
-        const resolvedPath = resolveScriptFilePath(path, containingPath, ".js");
+        const failedLookupLocations: string[] = [];
+        const candidates = getScriptCandidates(path, base);
+        let resolvedFileName: string | undefined;
+        for (const candidate of candidates) {
+          const candidateURI = getURI(host, candidate).toString();
+          if (this.fileExists!(candidateURI)) {
+            resolvedFileName = candidateURI;
+            break;
+          } else {
+            failedLookupLocations.push(candidateURI);
+          }
+        }
         return {
-          resolvedModule: {
-            resolvedFileName: monaco.Uri.from({
-              scheme: "file",
-              authority: containingUri.authority,
-              path: resolvedPath ?? undefined,
-            }).toString(),
-            extension: ".js",
-          },
+          resolvedModule: resolvedFileName
+            ? {
+                resolvedFileName,
+                extension: allScriptExtensions.find((ext) => resolvedFileName!.endsWith(ext))!,
+              }
+            : undefined,
+          failedLookupLocations,
         };
       });
     }
