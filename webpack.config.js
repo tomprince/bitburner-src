@@ -148,7 +148,7 @@ module.exports = (env, argv) => {
     module: {
       rules: [
         {
-          test: path.resolve(__dirname, "src/ScriptEditor/worker-url.js"),
+          test: path.resolve(__dirname, "src/ScriptEditor/worker-url.ts"),
           parser: {
             worker: ["String()"],
           },
