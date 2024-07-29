@@ -3,6 +3,7 @@
 // the script, we tell webpack that in this module, `String(new URL(...))` should be
 // treated as creating a web worker. That gives us access to the URL of the script,
 // which we can pass to monaco.
+// https://github.com/webpack/webpack/issues/18616
 const url = String(
   new URL(
     /* webpackChunkName: "custom-ts" */
