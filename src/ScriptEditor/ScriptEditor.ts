@@ -74,7 +74,7 @@ export class ScriptEditor {
         // Monaco allows us to extend the LanguageServiceHost it provides to the typescript
         // language server. We pass the URL of a web worker script that does that.
         // See `./worker.ts` for details.
-        customWorkerPath: __webpack_public_path__ + "custom-ts.js",
+        customWorkerPath: __webpack_public_path__ + "custom-ts.bundle.js",
       });
       languageDefaults.setCompilerOptions({
         ...languageDefaults.getCompilerOptions(),

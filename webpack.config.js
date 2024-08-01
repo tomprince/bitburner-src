@@ -226,7 +226,7 @@ module.exports = (env, argv) => {
       entry: "./src/ScriptEditor/worker.ts",
       output: {
         path: path.resolve(__dirname, outputDirectory),
-        filename: "custom-ts.js",
+        filename: "custom-ts.bundle.js",
         assetModuleFilename: "assets/[hash][ext][query]",
       },
       // We don't want to split chunks, as `custom-ts.js` needs to define `customTSWorkerFactory` synchronously
