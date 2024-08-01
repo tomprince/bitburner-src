@@ -13,7 +13,6 @@ import { Settings } from "../Settings/Settings";
 import { NetscriptExtra } from "../NetscriptFunctions/Extra";
 import * as enums from "../Enums";
 import { ns } from "../NetscriptFunctions";
-import workerUrl from "./worker-url";
 
 /** Event emitter used for tracking when changes have been made to a content file. */
 export const fileEditEvents = new EventEmitter<[hostname: string, filename: ContentFilePath]>();
@@ -75,7 +74,7 @@ export class ScriptEditor {
         // Monaco allows us to extend the LanguageServiceHost it provides to the typescript
         // language server. We pass the URL of a web worker script that does that.
         // See `./worker.ts` for details.
-        customWorkerPath: workerUrl,
+        customWorkerPath: __webpack_public_path__ + "custom-ts.js",
       });
       languageDefaults.setCompilerOptions({
         ...languageDefaults.getCompilerOptions(),

@@ -93,126 +93,163 @@ module.exports = (env, argv) => {
         },
   };
 
-  return {
-    plugins: [
-      new MonacoWebpackPlugin({ languages: ["javascript", "typescript", "json"] }),
-      new webpack.DefinePlugin({
-        "process.env.NODE_ENV": isDevelopment ? '"development"' : '"production"',
-      }),
-      new HtmlWebpackPlugin(htmlConfig),
-      new ForkTsCheckerWebpackPlugin({
-        typescript: {
-          diagnosticOptions: {
-            semantic: true,
-            syntactic: true,
-          },
+  /** @type import("webpack").Configuration["plugins"]} */
+  const commonPlugins = [
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": isDevelopment ? '"development"' : '"production"',
+      __COMMIT_HASH__: JSON.stringify(commitHash || "DEV"),
+    }),
+    new ForkTsCheckerWebpackPlugin({
+      typescript: {
+        diagnosticOptions: {
+          semantic: true,
+          syntactic: true,
         },
+      },
+    }),
+    // In dev mode, use a faster method of create sourcemaps
+    // while keeping lines/columns accurate
+    isDevServer &&
+      new webpack.EvalSourceMapDevToolPlugin({
+        // Exclude vendor files from sourcemaps
+        // This is a huge speed improvement for not much loss
+        exclude: ["vendor"],
+        columns: true,
+        module: true,
       }),
-      new webpack.DefinePlugin({
-        __COMMIT_HASH__: JSON.stringify(commitHash || "DEV"),
+    !isDevServer &&
+      new webpack.SourceMapDevToolPlugin({
+        filename: "[file].map",
+        columns: true,
+        module: true,
       }),
-      // In dev mode, use a faster method of create sourcemaps
-      // while keeping lines/columns accurate
-      isDevServer &&
-        new webpack.EvalSourceMapDevToolPlugin({
-          // Exclude vendor files from sourcemaps
-          // This is a huge speed improvement for not much loss
-          exclude: ["vendor"],
-          columns: true,
-          module: true,
+  ];
+
+  /** @type import("webpack").Configuration["optimization"]} */
+  const optimization = {
+    removeAvailableModules: true,
+    removeEmptyChunks: true,
+    mergeDuplicateChunks: true,
+    flagIncludedChunks: true,
+    sideEffects: true,
+    providedExports: true,
+    usedExports: true,
+    concatenateModules: false,
+    minimize: !isDevelopment,
+    portableRecords: true,
+  };
+
+  return [
+    {
+      name: "main",
+      dependencies: ["custom-ts-worker"],
+      plugins: [
+        ...commonPlugins,
+        new MonacoWebpackPlugin({ languages: ["javascript", "typescript", "json"] }),
+        new HtmlWebpackPlugin(htmlConfig),
+        enableReactRefresh && new ReactRefreshWebpackPlugin(),
+        new CopyPlugin({
+          patterns: [
+            {
+              from: "{tex-chtml.js,*/**/*}",
+              to: "mathjax",
+              context: "node_modules/mathjax-full/es5",
+            },
+          ],
         }),
-      !isDevServer &&
-        new webpack.SourceMapDevToolPlugin({
-          filename: "[file].map",
-          columns: true,
-          module: true,
-        }),
-      enableReactRefresh && new ReactRefreshWebpackPlugin(),
-      new CopyPlugin({
-        patterns: [
+      ].filter(Boolean),
+      target: "web",
+      entry: entry,
+      output: {
+        path: path.resolve(__dirname, outputDirectory),
+        filename: "[name].bundle.js",
+        assetModuleFilename: "assets/[hash][ext][query]",
+      },
+      module: {
+        rules: [
           {
-            from: "{tex-chtml.js,*/**/*}",
-            to: "mathjax",
-            context: "node_modules/mathjax-full/es5",
+            test: /\.(js$|jsx|ts|tsx)$/,
+            exclude: /node_modules/,
+            resourceQuery: { not: /raw/ },
+            use: {
+              loader: "babel-loader",
+              options: {
+                plugins: [enableReactRefresh && require.resolve("react-refresh/babel")].filter(Boolean),
+                cacheDirectory: true,
+              },
+            },
+          },
+          { test: /\.(ttf|woff2|png|jpe?g|gif|jp2|webp)$/, type: "asset/resource" },
+          {
+            test: /\.s?css$/,
+            use: ["style-loader", "css-loader"],
+          },
+          {
+            resourceQuery: /raw/,
+            type: "asset/source",
           },
         ],
-      }),
-    ].filter(Boolean),
-    target: "web",
-    entry: entry,
-    output: {
-      path: path.resolve(__dirname, outputDirectory),
-      filename: "[name].bundle.js",
-      assetModuleFilename: "assets/[hash][ext][query]",
-    },
-    module: {
-      rules: [
-        {
-          test: path.resolve(__dirname, "src/ScriptEditor/worker-url.ts"),
-          parser: {
-            worker: ["String()"],
-          },
-        },
-        {
-          test: /\.(js$|jsx|ts|tsx)$/,
-          exclude: /node_modules/,
-          resourceQuery: { not: /raw/ },
-          use: {
-            loader: "babel-loader",
-            options: {
-              plugins: [enableReactRefresh && require.resolve("react-refresh/babel")].filter(Boolean),
-              cacheDirectory: true,
+      },
+      optimization: {
+        ...optimization,
+        splitChunks: {
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: `vendor`,
+              chunks: "all",
             },
           },
         },
-        { test: /\.(ttf|woff2|png|jpe?g|gif|jp2|webp)$/, type: "asset/resource" },
-        {
-          test: /\.s?css$/,
-          use: ["style-loader", "css-loader"],
+      },
+      devServer: devServerSettings,
+      resolve: {
+        extensions: [".tsx", ".ts", ".js", ".jsx"],
+        alias: {
+          "@player": path.resolve(__dirname, "src/Player"),
+          "@enums": path.resolve(__dirname, "src/Enums"),
+          "@nsdefs": path.resolve(__dirname, "src/ScriptEditor/NetscriptDefinitions.d.ts"),
         },
+        fallback: { crypto: false },
+      },
+      stats: statsConfig,
+      ignoreWarnings: [
         {
-          resourceQuery: /raw/,
-          type: "asset/source",
+          module: /@babel\/standalone/,
+          message: /Critical dependency: the request of a dependency is an expression/,
         },
       ],
     },
-    optimization: {
-      removeAvailableModules: true,
-      removeEmptyChunks: true,
-      mergeDuplicateChunks: true,
-      flagIncludedChunks: true,
-      sideEffects: true,
-      providedExports: true,
-      usedExports: true,
-      concatenateModules: false,
-      minimize: !isDevelopment,
-      portableRecords: true,
-      splitChunks: {
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: `vendor`,
-            chunks: "all",
+    {
+      name: "custom-ts-worker",
+      target: "webworker",
+      entry: "./src/ScriptEditor/worker.ts",
+      output: {
+        path: path.resolve(__dirname, outputDirectory),
+        filename: "custom-ts.js",
+        assetModuleFilename: "assets/[hash][ext][query]",
+      },
+      // We don't want to split chunks, as `custom-ts.js` needs to define `customTSWorkerFactory` synchronously
+      // and webpack loads additional chunks asynchoronously: https://github.com/webpack/webpack/issues/18615
+      optimization,
+      plugins: commonPlugins,
+      resolve: {
+        extensions: [".tsx", ".ts", ".js", ".jsx"],
+      },
+      module: {
+        rules: [
+          {
+            test: /\.(js$|jsx|ts|tsx)$/,
+            exclude: /node_modules/,
+            use: {
+              loader: "babel-loader",
+              options: {
+                cacheDirectory: true,
+              },
+            },
           },
-        },
+        ],
       },
     },
-    devServer: devServerSettings,
-    resolve: {
-      extensions: [".tsx", ".ts", ".js", ".jsx"],
-      alias: {
-        "@player": path.resolve(__dirname, "src/Player"),
-        "@enums": path.resolve(__dirname, "src/Enums"),
-        "@nsdefs": path.resolve(__dirname, "src/ScriptEditor/NetscriptDefinitions.d.ts"),
-      },
-      fallback: { crypto: false },
-    },
-    stats: statsConfig,
-    ignoreWarnings: [
-      {
-        module: /@babel\/standalone/,
-        message: /Critical dependency: the request of a dependency is an expression/,
-      },
-    ],
-  };
+  ];
 };
